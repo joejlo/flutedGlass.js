@@ -39,6 +39,7 @@ float blob(vec2 p, vec2 c, float r) {
 }
 
 void main() {
+  // Stronger fluting movement too
   float col = texture2D(u_lookup, vec2(vUv.x, 0.0)).r * 255.0;
   float off = (rand(vec2(col, col)) - 0.5) * u_distortion;
 
@@ -49,17 +50,28 @@ void main() {
 
   float t = u_time;
 
-  // These lines make the blobs MOVE (so you can see animation clearly)
-  vec2 c1 = vec2(0.30 * u_aspect + 0.08 * sin(t * 0.9),  0.60 + 0.06 * cos(t * 0.7));
-  vec2 c2 = vec2(0.70 * u_aspect + 0.07 * cos(t * 0.8),  0.40 + 0.07 * sin(t * 0.6));
+  // DRAMATIC blob motion (large amplitude + faster)
+  vec2 c1 = vec2(
+    0.30 * u_aspect + 0.18 * sin(t * 1.8),
+    0.60 + 0.16 * cos(t * 1.5)
+  );
 
-  float a = blob(p, c1, 0.45);
-  float b = blob(p, c2, 0.45);
+  vec2 c2 = vec2(
+    0.70 * u_aspect + 0.16 * cos(t * 1.6),
+    0.40 + 0.18 * sin(t * 1.7)
+  );
+
+  float a = blob(p, c1, 0.52);
+  float b = blob(p, c2, 0.52);
 
   float alpha = max(a, b);
   vec3 color = mix(u_color_one, u_color_two, b);
 
-  gl_FragColor = vec4(color, alpha * 0.9);
+  // Extra obvious grain shimmer (temporary for testing)
+  float g = (rand(vUv * 200.0 + t * 12.0) - 0.5) * 0.08;
+  color += g;
+
+  gl_FragColor = vec4(color, alpha * 0.95);
 }
 `;
 
