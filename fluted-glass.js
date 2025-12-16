@@ -1,5 +1,5 @@
 /* =========================================================
-   Phase 1 – Core Fluted Glass Shader (Transparent Host)
+   Phase 1 – Core Fluted Glass Shader (Transparent)
    Webflow-friendly: use data-glass="true" (or any value except "false")
    Requires: three.min.js loaded globally before this file
    ========================================================= */
@@ -13,7 +13,6 @@
 
   const THREE = window.THREE;
 
-  // Standard Three vertex shader (camera matrices applied)
   const VERT = `
     varying vec2 vUv;
     void main() {
@@ -22,20 +21,70 @@
     }
   `;
 
-  // Phase 1 TEST shader: hard flash so motion is impossible to miss
-  // (We will replace this with the real glass shader once confirmed.)
+  // Phase 1 "real" shader: transparent glass blobs + fluting + grain + obvious drift
   const FRAG = `
     precision mediump float;
 
     varying vec2 vUv;
+
     uniform float u_time;
+    uniform float u_aspect;
+    uniform sampler2D u_lookup;
+    uniform float u_distortion;
+
     uniform vec3 u_color_one;
     uniform vec3 u_color_two;
 
+    float rand(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    }
+
+    float blob(vec2 p, vec2 c, float r, float t) {
+      vec2 d = p - c;
+      float dist = length(d);
+
+      // Organic edge wobble
+      float ang = atan(d.y, d.x);
+      float edge = sin(ang * 4.0 + t * 0.9) * 0.05 +
+                   sin(ang * 7.0 - t * 0.7) * 0.03;
+
+      float rr = r * (1.0 + edge);
+      float n = clamp(1.0 - dist / rr, 0.0, 1.0);
+
+      // Smooth falloff (nicer than linear)
+      return n * n * (3.0 - 2.0 * n);
+    }
+
     void main() {
-      float pulse = step(0.5, fract(u_time * 4.0));  // ~4 flashes/sec
-      vec3 color = mix(u_color_one, u_color_two, pulse);
-      gl_FragColor = vec4(color, 1.0);
+      // Fluting via lookup: offset x based on column index
+      float col = texture2D(u_lookup, vec2(vUv.x, 0.0)).r * 255.0;
+      float off = (rand(vec2(col, col)) - 0.5) * u_distortion;
+
+      vec2 uv = vUv;
+      uv.x += off * 0.8;
+
+      // Aspect-correct working space
+      vec2 p = vec2(uv.x * u_aspect, uv.y);
+      float t = u_time;
+
+      // Clearly visible drift (we'll make this subtler later)
+      vec2 c1 = vec2(0.28 * u_aspect + 0.06 * sin(t * 0.9),  0.62 + 0.05 * cos(t * 0.7));
+      vec2 c2 = vec2(0.72 * u_aspect + 0.05 * cos(t * 0.8),  0.38 + 0.06 * sin(t * 0.6));
+
+      float a = blob(p, c1, 0.55, t);
+      float b = blob(p, c2, 0.55, t + 10.0);
+
+      float alpha = max(a, b);
+
+      // Two-colour blend
+      vec3 colr = mix(u_color_one, u_color_two, b);
+
+      // Grain to break flatness (subtle)
+      float g = (rand(vUv * 280.0 + t * 12.0) - 0.5) * 0.05;
+      colr += g;
+
+      // Transparent output: only draw where blobs exist
+      gl_FragColor = vec4(colr, alpha * 0.85);
     }
   `;
 
@@ -62,7 +111,6 @@
   }
 
   function init(el) {
-    // Prevent double-init
     if (el.__glassInit) return;
     el.__glassInit = true;
 
@@ -87,16 +135,16 @@
     el.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-
-    // Match Webflow-style unit plane setup
     const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, -1, 1);
 
-    // Not used in the test shader, but kept for parity
-    const lookup = makeLookup(parseInt(el.getAttribute("data-columns") || "5", 10));
+    const columns = parseInt(el.getAttribute("data-columns") || "6", 10);
+    const lookup = makeLookup(Number.isFinite(columns) ? columns : 6);
 
     const uniforms = {
       u_time: { value: 0 },
+      u_aspect: { value: rect.width / rect.height },
       u_lookup: { value: lookup },
+      u_distortion: { value: parseFloat(el.getAttribute("data-distortion") || "0.28") },
       u_color_one: { value: new THREE.Color(el.getAttribute("data-color-one") || "#741de2") },
       u_color_two: { value: new THREE.Color(el.getAttribute("data-color-two") || "#77bebb") },
     };
@@ -111,7 +159,7 @@
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
     scene.add(mesh);
 
-    // Resize handling
+    // Resize (basic for Phase 1)
     let resizeTimer = null;
     window.addEventListener("resize", () => {
       clearTimeout(resizeTimer);
@@ -119,13 +167,11 @@
         const r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) return;
         renderer.setSize(r.width, r.height, false);
+        uniforms.u_aspect.value = r.width / r.height;
       }, 120);
     });
 
     function frame(t) {
-      // Console proof once per second
-      if (((t | 0) % 1000) < 16) console.log("[glass] ticking", t | 0);
-
       uniforms.u_time.value = t * 0.001;
       renderer.render(scene, camera);
       requestAnimationFrame(frame);
