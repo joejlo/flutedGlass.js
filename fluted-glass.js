@@ -21,59 +21,19 @@ precision mediump float;
 
 varying vec2 vUv;
 uniform float u_time;
-uniform float u_aspect;
-uniform sampler2D u_lookup;
-uniform float u_distortion;
-
 uniform vec3 u_color_one;
 uniform vec3 u_color_two;
 
-float rand(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float blob(vec2 p, vec2 c, float r) {
-  float d = length(p - c);
-  float t = clamp(1.0 - d / r, 0.0, 1.0);
-  return t * t * (3.0 - 2.0 * t);
-}
-
 void main() {
-  // Stronger fluting movement too
-  float col = texture2D(u_lookup, vec2(vUv.x, 0.0)).r * 255.0;
-  float off = (rand(vec2(col, col)) - 0.5) * u_distortion;
+  // Hard pulse between two colours ~4 times per second
+  float pulse = step(0.5, fract(u_time * 4.0));
+  vec3 color = mix(u_color_one, u_color_two, pulse);
 
-  vec2 uv = vUv;
-  uv.x += off;
-
-  vec2 p = vec2(uv.x * u_aspect, uv.y);
-
-  float t = u_time;
-
-  // DRAMATIC blob motion (large amplitude + faster)
-  vec2 c1 = vec2(
-    0.30 * u_aspect + 0.18 * sin(t * 1.8),
-    0.60 + 0.16 * cos(t * 1.5)
-  );
-
-  vec2 c2 = vec2(
-    0.70 * u_aspect + 0.16 * cos(t * 1.6),
-    0.40 + 0.18 * sin(t * 1.7)
-  );
-
-  float a = blob(p, c1, 0.52);
-  float b = blob(p, c2, 0.52);
-
-  float alpha = max(a, b);
-  vec3 color = mix(u_color_one, u_color_two, b);
-
-  // Extra obvious grain shimmer (temporary for testing)
-  float g = (rand(vUv * 200.0 + t * 12.0) - 0.5) * 0.08;
-  color += g;
-
-  gl_FragColor = vec4(color, alpha * 0.95);
+  // Make the whole thing opaque so you cannot miss it
+  gl_FragColor = vec4(color, 1.0);
 }
 `;
+
 
 
   function makeLookup(columns) {
