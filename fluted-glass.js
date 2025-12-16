@@ -16,47 +16,53 @@
     }
   `;
 
-  const FRAG = `
-    precision mediump float;
+const FRAG = `
+precision mediump float;
 
-    varying vec2 vUv;
-    uniform float u_time;
-    uniform float u_aspect;
-    uniform sampler2D u_lookup;
-    uniform float u_distortion;
+varying vec2 vUv;
+uniform float u_time;
+uniform float u_aspect;
+uniform sampler2D u_lookup;
+uniform float u_distortion;
 
-    uniform vec3 u_color_one;
-    uniform vec3 u_color_two;
+uniform vec3 u_color_one;
+uniform vec3 u_color_two;
 
-    float hash(float n) {
-      return fract(sin(n) * 43758.5453);
-    }
+float rand(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
 
-    float blob(vec2 p, vec2 c, float r) {
-      float d = length(p - c);
-      float t = clamp(1.0 - d / r, 0.0, 1.0);
-      return t * t;
-    }
+float blob(vec2 p, vec2 c, float r) {
+  float d = length(p - c);
+  float t = clamp(1.0 - d / r, 0.0, 1.0);
+  return t * t * (3.0 - 2.0 * t);
+}
 
-    void main() {
-      // Fluting via lookup texture
-      float col = texture2D(u_lookup, vec2(vUv.x, 0.0)).r * 255.0;
-      float off = (hash(col) - 0.5) * u_distortion;
+void main() {
+  float col = texture2D(u_lookup, vec2(vUv.x, 0.0)).r * 255.0;
+  float off = (rand(vec2(col, col)) - 0.5) * u_distortion;
 
-      vec2 uv = vUv;
-      uv.x += off;
+  vec2 uv = vUv;
+  uv.x += off;
 
-      vec2 p = vec2(uv.x * u_aspect, uv.y);
+  vec2 p = vec2(uv.x * u_aspect, uv.y);
 
-      float a = blob(p, vec2(0.3 * u_aspect, 0.6), 0.35);
-      float b = blob(p, vec2(0.7 * u_aspect, 0.4), 0.35);
+  float t = u_time;
 
-      float alpha = max(a, b);
+  // These lines make the blobs MOVE (so you can see animation clearly)
+  vec2 c1 = vec2(0.30 * u_aspect + 0.08 * sin(t * 0.9),  0.60 + 0.06 * cos(t * 0.7));
+  vec2 c2 = vec2(0.70 * u_aspect + 0.07 * cos(t * 0.8),  0.40 + 0.07 * sin(t * 0.6));
 
-      vec3 colr = mix(u_color_one, u_color_two, b);
-      gl_FragColor = vec4(colr, alpha);
-    }
-  `;
+  float a = blob(p, c1, 0.45);
+  float b = blob(p, c2, 0.45);
+
+  float alpha = max(a, b);
+  vec3 color = mix(u_color_one, u_color_two, b);
+
+  gl_FragColor = vec4(color, alpha * 0.9);
+}
+`;
+
 
   function makeLookup(columns) {
     const size = 256;
