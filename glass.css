@@ -1,0 +1,23 @@
+/* Glass host */
+[data-glass] {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The renderer inserts a canvas; make it behave */
+[data-glass] canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Your surface styling (optional) */
+.glass-panel {
+  border-radius: 16px;
+  overflow: hidden; /* clip the canvas to radius */
+  min-height: 220px; /* IMPORTANT: must have a height to render */
+}
