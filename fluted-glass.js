@@ -122,6 +122,11 @@
   }
 
   window.addEventListener("load", () => {
-    document.querySelectorAll("[data-glass]").forEach(init);
+    document
+      .querySelectorAll('[data-glass]')
+      .forEach(el => {
+         const val = el.getAttribute('data-glass');
+         if (val !== 'false') init(el);
+      });
   });
 })();
